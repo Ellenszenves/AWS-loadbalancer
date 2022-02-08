@@ -1,4 +1,9 @@
 #!/bin/bash
+#Order: start_instance, describe, nginx, create_target, target_instanced
+ip1=""
+ip2=""
+id1=""
+id2=""
 #2db EC2 instance indítása
 start_instances() {
 aws ec2 run-instances --image-id ami-042ad9eec03638628 \
@@ -14,28 +19,32 @@ starter
 }
 
 describe_my_instances() {
-    aws ec2 describe-instances --filters "Name=tag:Name,Values=erdely*"
-#Only instance IDs
-    aws ec2 describe-instances --filters "Name=tag:Name,Values=erdely*" \
-     --output text --query 'Reservations[*].Instances[*].InstanceId'
 #InstanceID and public IP
-    aws ec2 describe-instances --filters "Name=tag:Name,Values=erdelyi*" "Name=instance-state-name,Values=running" \
-       --output text --query 'Reservations[*].Instances[*].[PublicIpAddress,InstanceId,Tags[?Key==`Name`].Value]'
+desc=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=erdelyi*" "Name=instance-state-name,Values=running" \
+       --output text --query 'Reservations[*].Instances[*].[PublicIpAddress,InstanceId,Tags[?Key==`Name`].Value]')
+while IFS=" " read -r ips
+do
+ezaz+="$ips "
+done <<< "$desc"
+ip1=$(echo $ezaz | cut -d " " -f 1)
+ip2=$(echo $ezaz | cut -d " " -f 4)
+id1=$(echo $ezaz | cut -d " " -f 2)
+id2=$(echo $ezaz | cut -d " " -f 5)
+echo "First instance IP:" $ip1 "ID:" $id1
+echo "Second instance IP:" $ip2 "ID:" $id2
+starter
 }
 
 install_nginx() {
 read -p "How many instance:" num
 if [ "$num" == 1 ]
 then
-    read -p "IP address:" address
-    ssh -i "/e/erdelyi-tamas.pem" ubuntu@$address < nginx.sh
+    ssh -i "/home/ubuntu/host/erdelyi-tamas.pem" ubuntu@$ip1 < nginx.sh
     starter
 elif [ "$num" == 2 ]
 then
-    read -p "IP address 1:" address1
-    read -p "IP address 2:" address2
-    ssh -i "/e/erdelyi-tamas.pem" ubuntu@$address < nginx.sh
-    ssh -i "/e/erdelyi-tamas.pem" ubuntu@$address2 < nginx2.sh
+    ssh -i "/home/ubuntu/host/erdelyi-tamas.pem" ubuntu@$ip1 < nginx.sh
+    ssh -i "/home/ubuntu/host/erdelyi-tamas.pem" ubuntu@$ip2 < nginx2.sh
     starter
 fi
 }
@@ -52,13 +61,14 @@ target_instances() {
 read -p "First instance ID:" first
 read -p "Second instance ID:" second
 aws elbv2 register-targets --target-group-arn \
---targets Id=$first,$second
+--targets Id=$id1,$id2
 starter
 }
 
 help() {
     printf "            ec2 = Starting 2 EC2 instances \n
             nginx = Start nginx on the instances \n
+            describe = Describe my instances \n
             target = Creating target group \n
             ec2_target = Add instances to the target group \n
             exit = Exit the program \n"
@@ -76,6 +86,9 @@ starter() {
     elif [ "$func" == "nginx" ]
     then
     install_nginx
+    elif [ "$func" == "describe" ]
+    then
+    describe_my_instances
     elif [ "$func" == "target" ]
     then
     create_target
