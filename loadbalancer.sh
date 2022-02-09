@@ -1,9 +1,10 @@
 #!/bin/bash
-#Order: start_instance, describe, nginx, create_target, target_instanced
+#Order: ec2, describe, nginx, target, ec2_target, loadbalancer
 ip1=""
 ip2=""
 id1=""
 id2=""
+
 #2db EC2 instance indítása
 start_instances() {
 aws ec2 run-instances --image-id ami-042ad9eec03638628 \
@@ -35,6 +36,7 @@ echo "Second instance IP:" $ip2 "ID:" $id2
 starter
 }
 
+#The name speaks for itself
 install_nginx() {
 read -p "How many instance:" num
 if [ "$num" == 1 ]
@@ -63,22 +65,29 @@ starter
 target_instances() {
 #Add instances to the target group OK
 grouparn=$(aws elbv2 describe-target-groups --names team8-targetGroup | grep -i "TargetGroupArn" | cut -d '"' -f 4)
-
 aws elbv2 register-targets --target-group-arn $grouparn \
 --targets Id=$id1 Id=$id2
 starter
 }
 
 loadbalancer() {
+grouparn=$(aws elbv2 describe-target-groups --names team8-targetGroup | grep -i "TargetGroupArn" | cut -d '"' -f 4)
     aws ec2 create-security-group --group-name team8-loadbalance \
     --description "Load balancer for team 8" \
     --vpc-id vpc-0a169bcf3056ea695
+#Inbound rule - only available on port 80
+aws ec2 authorize-security-group-ingress --group-name team8-loadbalance \
+--protocol tcp \
+--port 80 \
+--cidr 0.0.0.0/0
+
+secure=$(aws ec2 describe-security-groups --group-names team8-loadbalance --query "SecurityGroups[*].[GroupId]" --output text)
 
 aws elbv2 create-load-balancer --name team8-loadbalancer \
---subnets \
---security-groups 
+--subnets subnet-08dfcde0987331ae7 subnet-0b961cdffe0cf2af8 subnet-02d203f989dfb4dd8 \
+--security-groups $secure
 
-loadbalancearn=$()
+loadbalancearn=$(aws elbv2 describe-load-balancers --names team8-loadbalancer --query "LoadBalancers[*].[LoadBalancerArn]" --output text)
 
 aws elbv2 create-listener --load-balancer-arn $loadbalancearn \
 --protocol HTTP --port 80 \
