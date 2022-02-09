@@ -50,18 +50,39 @@ fi
 }
 
 create_target() {
-#Target Group
+#Target Group OK
 aws elbv2 create-target-group --name team8-targetGroup --protocol HTTP \
---port 3000 --vpc-id vpc-0a169bcf3056ea695
+--target-type instance \
+--port 3000 --vpc-id vpc-0a169bcf3056ea695 --health-check-port 3000 \
+--health-check-enabled --health-check-path / --health-check-interval-seconds 5 \
+--health-check-timeout-seconds 2 --healthy-threshold-count 2 \
+--matcher HttpCode="200"
 starter
 }
 
 target_instances() {
-#Add instances to the target group
-read -p "First instance ID:" first
-read -p "Second instance ID:" second
-aws elbv2 register-targets --target-group-arn \
---targets Id=$id1,$id2
+#Add instances to the target group OK
+grouparn=$(aws elbv2 describe-target-groups --names team8-targetGroup | grep -i "TargetGroupArn" | cut -d '"' -f 4)
+
+aws elbv2 register-targets --target-group-arn $grouparn \
+--targets Id=$id1 Id=$id2
+starter
+}
+
+loadbalancer() {
+    aws ec2 create-security-group --group-name team8-loadbalance \
+    --description "Load balancer for team 8" \
+    --vpc-id vpc-0a169bcf3056ea695
+
+aws elbv2 create-load-balancer --name team8-loadbalancer \
+--subnets \
+--security-groups 
+
+loadbalancearn=$()
+
+aws elbv2 create-listener --load-balancer-arn $loadbalancearn \
+--protocol HTTP --port 80 \
+--default-actions Type=forward,TargetGroupArn=$grouparn
 starter
 }
 
@@ -71,6 +92,7 @@ help() {
             describe = Describe my instances \n
             target = Creating target group \n
             ec2_target = Add instances to the target group \n
+            loadbalancer = Creating application load balancer \n
             exit = Exit the program \n"
     starter
 }
@@ -95,6 +117,9 @@ starter() {
     elif [ "$func" == "ec2_target" ]
     then
     target_instances
+    elif [ "$func" == "loadbalancer" ]
+    then
+    loadbalancer
     elif [ "$func" == "exit" ]
     then
     exit
