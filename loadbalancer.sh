@@ -123,7 +123,7 @@ loadbalancearn=$(aws elbv2 describe-load-balancers --names team8-loadbalancer --
 
 aws elbv2 create-listener --load-balancer-arn $loadbalancearn \
 --protocol HTTP --port 80 \
---default-actions Type=forward,TargetGroupArn=$
+--default-actions Type=forward,TargetGroupArn=$grouparn
 fi
 starter
 }
@@ -160,7 +160,11 @@ starter() {
     loadbalancer
     elif [ "$func" == "exit" ]
     then
+    echo "Bye!"
     exit
+    else
+    echo "Wrong command!"
+    starter
     fi
 }
 echo "Load Balancer project"
