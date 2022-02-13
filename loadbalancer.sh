@@ -25,19 +25,19 @@ else
 #Ha futnak már futnak a gépek, itt ki lehet őket lőni.
 echo "Instances are already running."
 read -p "Terminate the instances?" term
-if [ "$term" == "yes" ]
-then
-while IFS=" " read -r ips
-do
-ezaz+="$ips "
-done <<< "$desc"
-id1=$(echo $ezaz | cut -d " " -f 2)
-id2=$(echo $ezaz | cut -d " " -f 5)
-aws ec2 terminate-instances --instance-ids $id1 $id2
-starter
-else
-starter
-fi
+    if [ "$term" == "yes" ]
+    then
+        while IFS=" " read -r ips
+        do
+        ezaz+="$ips "
+        done <<< "$desc"
+        id1=$(echo $ezaz | cut -d " " -f 2)
+        id2=$(echo $ezaz | cut -d " " -f 5)
+        aws ec2 terminate-instances --instance-ids $id1 $id2
+        starter
+    else
+    starter
+    fi
 fi
 }
 
@@ -72,17 +72,23 @@ then
 echo "Nginx is already installed!"
 starter
 else
-read -p "How many instance:" num
-if [ "$num" == 1 ]
-then
-    ssh -i "/home/ubuntu/host/erdelyi-tamas.pem" ubuntu@$ip1 < nginx.sh
-    starter
-elif [ "$num" == 2 ]
-then
-    ssh -i "/home/ubuntu/host/erdelyi-tamas.pem" ubuntu@$ip1 < nginx.sh
-    ssh -i "/home/ubuntu/host/erdelyi-tamas.pem" ubuntu@$ip2 < nginx2.sh
-    starter
-fi
+desc=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=erdelyi*" "Name=instance-state-name,Values=running" \
+       --output text --query 'Reservations[*].Instances[*].[PublicIpAddress,InstanceId,Tags[?Key==`Name`].Value]')
+        if [ -z "$desc" ]
+        then
+        echo "Instance not available!"
+        read -p "You want to make the instances?" make
+            if [ "$make" == "yes" ]
+            then
+            start_instances
+            else
+            starter
+            fi
+        else
+        ssh -i "/home/ubuntu/host/erdelyi-tamas.pem" ubuntu@$ip1 < nginx.sh
+        ssh -i "/home/ubuntu/host/erdelyi-tamas.pem" ubuntu@$ip2 < nginx2.sh
+        starter
+        fi
 fi
 }
 
