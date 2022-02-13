@@ -22,8 +22,22 @@ aws ec2 run-instances --image-id ami-042ad9eec03638628 \
 --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=erdelyi-tamas-nginx2}]'
 starter
 else
+#Ha futnak már futnak a gépek, itt ki lehet őket lőni.
 echo "Instances are already running."
+read -p "Terminate the instances?" term
+if [ "$term" == "yes" ]
+then
+while IFS=" " read -r ips
+do
+ezaz+="$ips "
+done <<< "$desc"
+id1=$(echo $ezaz | cut -d " " -f 2)
+id2=$(echo $ezaz | cut -d " " -f 5)
+aws ec2 terminate-instances --instance-ids $id1 $id2
 starter
+else
+starter
+fi
 fi
 }
 
@@ -78,7 +92,15 @@ target_test=$(aws elbv2 describe-target-groups --names team8-targetGroup --query
 if [ "$target_test" == "team8-targetGroup" ]
 then
 echo "Target group are already created!"
+read -p "Delete target group?" del_target
+if [ "$del_target" == "yes" ]
+then
+grouparn=$(aws elbv2 describe-target-groups --names team8-targetGroup | grep -i "TargetGroupArn" | cut -d '"' -f 4)
+aws elbv2 delete-target-group --target-group-arn $grouparn
 starter
+else
+starter
+fi
 else
 aws elbv2 create-target-group --name team8-targetGroup --protocol HTTP \
 --target-type instance \
@@ -99,6 +121,11 @@ securitytest=$(aws ec2 describe-security-groups --group-names team8-loadbalance 
 if [ "$securitytest" == "team8-loadbalance" ]
 then
 echo "Security group already created!"
+read -p "Delete security group?" del_group
+    if [ "$del_group" == "yes" ]
+    then
+    aws ec2 delete-security-group --group-name team8-loadbalance
+    fi
 else
     aws ec2 create-security-group --group-name team8-loadbalance \
     --description "Load balancer for team 8" \
@@ -114,6 +141,12 @@ loadbalancertest=$(aws elbv2 describe-load-balancers --names team8-loadbalancer 
 if [ "$loadbalancertest" == "team8-loadbalancer" ]
 then
 echo "Load balancer already created!"
+read -r "Delete load balancer?" del_balancer
+    if [ "$del_balancer" == "yes" ]
+    then
+    loadbalancearn=$(aws elbv2 describe-load-balancers --names team8-loadbalancer --query "LoadBalancers[*].[LoadBalancerArn]" --output text)
+    aws elbv2 delete-load-balancer --load-balancer-arn $loadbalancearn
+    fi
 else
 aws elbv2 create-load-balancer --name team8-loadbalancer \
 --subnets subnet-08dfcde0987331ae7 subnet-0b961cdffe0cf2af8 subnet-02d203f989dfb4dd8 \
